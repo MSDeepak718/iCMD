@@ -1,0 +1,18 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "icmd-cli"
+version = "0.1.5"
+description = "AI-powered command line tool using local LLM"
+readme = "README.md"
+authors = [
+    {name = "Deepak Karthick"}
+]
+requires-python = ">=3.8"
+dependencies = [
+    "requests"
+]
+[project.scripts]
+icmd = "icmd.main:run"
