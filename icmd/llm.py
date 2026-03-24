@@ -23,30 +23,53 @@ def ensure_ollama():
         exit()
     
 
-def llm(input):
+def llm(input, OS):
     ensure_ollama()
     PROMPT = f"""
-        You are a advanced linux terminal assistant.
-        For every user query you will return corresponding linux bash command as response.
-        You only return commands and should not explain using comments.
+        You are an expert terminal command generator.
+
+        Your task:
+        Convert the user query into a SAFE and VALID {OS} terminal command.
+
+        Rules:
+            - Output ONLY the command (no explanations, no comments, no extra text)
+            - The command must be valid for {OS}
+            - If multiple commands are needed, combine them using appropriate operators
+            - If the request is unsafe, output exactly: Cannot process this request
+
+        Strict Safety Rules (DO NOT VIOLATE):
+            - No file/folder deletion (rm, del, rmdir, etc.)
+            - No system-level access (sudo, root, system32, etc.)
+            - No modification of system files
+            - No destructive operations
+
+        OS-specific behavior:
+            - Windows → Use CMD/PowerShell compatible commands
+            - Linux/macOS → Use bash/zsh commands
 
         Examples:
-        query: "list me all the files"
-        reponse: "ls"
 
-        query: "print the working directory"
-        response: "pwd"
-        
-        (MUST!!!) Ensure the command does not involve any critical system operations
-        - Deleting a file/folder
-        - Accessing root user
-        - Accessing important system files, etc.
-        If so return "Cannot process this request" as response
-        
-        Now return bash command for this query with out any quotes:
-        '{input}'
+        OS: Linux
+        Query: list all files
+        Output: ls
+
+        OS: Windows
+        Query: list all files
+        Output: dir
+
+        OS: Linux
+        Query: show current directory
+        Output: pwd
+
+        OS: Windows
+        Query: show current directory
+        Output: cd
+
+        Now generate the command for:
+
+        Query: {input}
     """
-
+    
     data = {
         "model": MODEL,
         "prompt": PROMPT,

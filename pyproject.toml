@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "icmd-cli"
-version = "0.1.5"
+version = "0.1.6"
 description = "AI-powered command line tool using local LLM"
 readme = "README.md"
 authors = [
