@@ -10,3 +10,7 @@ wheels/
 .venv
 .git
 .env
+
+flow.txt
+fine-tuning/commands.json
+fine-tuning/complex_linux_commands_million.json

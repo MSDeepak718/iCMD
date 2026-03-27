@@ -12,7 +12,12 @@ authors = [
 ]
 requires-python = ">=3.8"
 dependencies = [
-    "requests"
+    "requests",
 ]
 [project.scripts]
 icmd = "icmd.main:run"
+
+[tool.uv.workspace]
+members = [
+    "fine-tuning",
+]
