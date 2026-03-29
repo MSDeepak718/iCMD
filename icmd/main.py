@@ -19,14 +19,24 @@ def run():
     query = " ".join(sys.argv[1:])
     command = llm(query, OS)
     cleaned = clean(command)
+    if cleaned.lower().startswith("error running model"):
+        print(cleaned)
+        return
+    if not cleaned:
+        print("No command was generated")
+        return
     if cleaned.lower() == "cannot process this request":
         print("cannot process this request")
         return
     if is_dangerous(cleaned):
         print("Unsafe command to execute")
         return
+    print(f"$ {cleaned}")
     result = execute(cleaned)
-    print(result)
+    if result:
+        print(result)
+    else:
+        print("Command executed successfully but produced no output")
         
 if __name__ == "__main__":
     run()

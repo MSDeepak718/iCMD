@@ -1,81 +1,120 @@
-import requests
+import os
+import re
 import subprocess
+from huggingface_hub import hf_hub_download
 
-MODEL = "qwen2.5-coder"
-OLLAMA_URL = 'http://localhost:11434'
+MODEL_REPO = "MSDeepak718/qwen-icmd"
+MODEL_FILE = "qwen-icmd-q4.gguf"
 
-def ensure_ollama():
-    try:
-        requests.get(OLLAMA_URL)
-        res = requests.get(f"{OLLAMA_URL}/api/tags").json()
-        models = [m["name"] for m in res.get("models", [])]
+CACHE_DIR = os.path.expanduser("~/.icmd_model")
+MODEL_PATH = os.path.join(CACHE_DIR, MODEL_FILE)
+
+# Path to bundled llama binary
+LLAMA_BIN = os.path.join(os.path.dirname(__file__), "bin/llama-cli")
+
+
+def ensure_model():
+    os.makedirs(CACHE_DIR, exist_ok=True)
+
+    if not os.path.exists(MODEL_PATH):
+        print("Downloading iCMD model (~400MB)...")
+
+        hf_hub_download(
+            repo_id=MODEL_REPO,
+            filename=MODEL_FILE,
+            local_dir=CACHE_DIR
+        )
+
+
+def extract_command(raw_output, user_input):
+    text = raw_output.replace("\r", "")
+    prompt_markers = [
+        f"input: {user_input}\noutput:",
+        f"Request: {user_input}\nCommand:",
+    ]
+
+    for marker in prompt_markers:
+        if marker in text:
+            text = text.rsplit(marker, 1)[-1]
+            break
+
+    lines = []
+    for raw_line in text.splitlines():
+        line = raw_line.strip()
+        if not line:
+            continue
+
+        lower = line.lower()
+        if (
+            lower.startswith("loading model")
+            or lower.startswith("build")
+            or lower.startswith("model")
+            or lower.startswith("modalities")
+            or lower.startswith("available commands")
+            or lower.startswith("exiting")
+            or lower.startswith("/exit")
+            or lower.startswith("/regen")
+            or lower.startswith("/clear")
+            or lower.startswith("/read")
+            or lower.startswith("/glob")
+            or lower.startswith("input:")
+            or lower.startswith("output:")
+            or lower.startswith("generate exactly one valid")
+            or lower.startswith("rules:")
+            or lower.startswith("- output only the command")
+            or lower.startswith("- no explanation")
+            or lower.startswith("- no markdown")
+            or lower.startswith(">")
+        ):
+            continue
+
+        if re.fullmatch(r"[▄█▀ ]+", line):
+            continue
+
+        lines.append(line)
+
+    if not lines:
+        return ""
+
+    command_line_pattern = re.compile(r"^[A-Za-z0-9._/\-~]+(?:\s+[^[:cntrl:]\n\r]*)?$")
+
+    for line in lines:
+        if command_line_pattern.fullmatch(line):
+            return line
+
+    return lines[0]
+
+
+def llm(user_input, OS):
+    ensure_model()
+
+    prompt = f"""Generate exactly one valid {OS} terminal command.
+Rules:
+- Output only the command
+- No explanation
+- No markdown
+
+input: {user_input}
+output:"""
     
-        if not any(model == MODEL or model.startswith(f"{MODEL}:") for model in models):
-            subprocess.run(
-                ["ollama", "pull", MODEL],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                check=True,
-            )
-    except Exception:
-        print("Ollama is not installed or running.")
-        print("Install from: https://ollama.com")
-        exit()
-    
+    result = subprocess.run(
+        [
+            LLAMA_BIN,
+            "-m", MODEL_PATH,
+            "-p", prompt,
+            "-n", "20",
+            "--temp", "0.0",
+            "--no-display-prompt",
+            "--simple-io",
+            "--single-turn",
+            "--no-warmup",
+        ],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
 
-def llm(input, OS):
-    ensure_ollama()
-    PROMPT = f"""
-        You are an expert terminal command generator.
+    if result.returncode != 0:
+        return f"Error running model: {result.stderr.strip() or result.stdout.strip() or 'unknown error'}"
 
-        Your task:
-        Convert the user query into a SAFE and VALID {OS} terminal command.
-
-        Rules:
-            - Output ONLY the command (no explanations, no comments, no extra text)
-            - The command must be valid for {OS}
-            - If multiple commands are needed, combine them using appropriate operators
-            - If the request is unsafe, output exactly: Cannot process this request
-
-        Strict Safety Rules (DO NOT VIOLATE):
-            - No file/folder deletion (rm, del, rmdir, etc.)
-            - No system-level access (sudo, root, system32, etc.)
-            - No modification of system files
-            - No destructive operations
-
-        OS-specific behavior:
-            - Windows → Use CMD/PowerShell compatible commands
-            - Linux/macOS → Use bash/zsh commands
-
-        Examples:
-
-        OS: Linux
-        Query: list all files
-        Output: ls
-
-        OS: Windows
-        Query: list all files
-        Output: dir
-
-        OS: Linux
-        Query: show current directory
-        Output: pwd
-
-        OS: Windows
-        Query: show current directory
-        Output: cd
-
-        Now generate the command for:
-
-        Query: {input}
-    """
-    
-    data = {
-        "model": MODEL,
-        "prompt": PROMPT,
-        "stream": False
-    }
-    
-    response = requests.post(f"{OLLAMA_URL}/api/generate", json=data)
-    response.raise_for_status()
-    return response.json()["response"]
+    return extract_command(result.stdout, user_input)

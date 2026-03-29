@@ -2,12 +2,16 @@
 
 `iCMD` is a local AI-powered command-line assistant that turns natural language prompts into Linux shell commands, runs the generated command, and prints the result back to your terminal.
 
+It uses a fine-tuned `Qwen`-based GGUF model hosted on Hugging Face and runs inference locally through a bundled `llama-cli` binary.
+
 ## Features
 
-- Converts plain-English requests into bash commands using a local Ollama model
+- Converts plain-English requests into bash commands using a fine-tuned local model
 - Executes commands directly from the CLI with a simple `icmd "..."` interface
+- Downloads the fine-tuned model automatically on first run
+- Runs fully locally using a bundled `llama-cli` binary and GGUF weights
 - Includes basic safety blocking for dangerous commands and shell operators
-- Works fully with a local model setup instead of a hosted LLM API
+- Works without a hosted LLM API after the model is downloaded
 
 ## Usage Examples
 
@@ -31,16 +35,31 @@ Before using `iCMD`, make sure the target system has:
 
 - Python 3.8 or newer
 - `pip`, `uv`, or `pipx` for installation
-- [Ollama](https://ollama.com) installed and running
-- The `qwen2.5-coder` model available locally, or network access the first time so Ollama can pull it
+- a Linux x86_64 environment that can run the bundled `llama-cli` binary
+- network access on first run so `iCMD` can download the fine-tuned model from Hugging Face
 - A Linux environment, since the tool generates bash commands
 
-To prepare Ollama manually:
+## Fine-Tuned Model
+
+`iCMD` uses the fine-tuned model published at:
+
+```text
+MSDeepak718/qwen-icmd
+```
+
+The downloaded model file is:
 
 ```bash
-ollama serve
-ollama pull qwen2.5-coder
+qwen-icmd-q4.gguf
 ```
+
+On first run, `iCMD` downloads the model to:
+
+```text
+~/.icmd_model/qwen-icmd-q4.gguf
+```
+
+After that, inference runs locally using the bundled `llama-cli` executable inside the package.
 
 ## Installation
 
@@ -73,8 +92,8 @@ pipx install icmd-cli
 ## How It Works
 
 1. You pass a natural-language prompt to `icmd`.
-2. The app sends the prompt to Ollama using the `qwen2.5-coder` model.
-3. The model returns a bash command.
+2. If needed, the app downloads the fine-tuned GGUF model from Hugging Face.
+3. The app runs the prompt locally through the bundled `llama-cli` binary.
 4. The command is cleaned and checked against a small denylist of dangerous commands and shell symbols.
 5. If the command is allowed, `iCMD` executes it and prints the output.
 
@@ -115,6 +134,8 @@ Usage: icmd "your query"
 
 ```text
 icmd/
+├── bin/
+│   └── llama-cli
 ├── executor.py
 ├── llm.py
 ├── main.py
@@ -130,21 +151,28 @@ README.md
 
 Your system Python is managed by the OS. Use a virtual environment, `uv`, or `pipx` instead of installing globally with `pip`.
 
-### `Ollama is not installed or running.`
+### The first run takes time
 
-Install Ollama and make sure the service is available at:
+This is expected. `iCMD` downloads the fine-tuned model the first time you use it.
 
-```text
-http://localhost:11434
-```
+### Model download fails
+
+Make sure you have working network access and that Hugging Face is reachable from your machine.
+
+### `llama-cli` is missing
+
+If `icmd` fails with a missing `icmd/bin/llama-cli` error, the installed package likely does not include the bundled binary. Reinstall or upgrade to the latest published version of `icmd-cli`.
 
 ### The package installs but `icmd` fails at runtime
 
 Check that:
 
-- Ollama is running
-- the `qwen2.5-coder` model exists locally
+```text
+~/.icmd_model/qwen-icmd-q4.gguf
+```
+- the model file exists locally
 - the installed package version is the latest one you published
+- the installed package includes the bundled `llama-cli` binary
 
 ## Author
 

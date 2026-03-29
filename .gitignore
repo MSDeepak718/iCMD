@@ -12,5 +12,8 @@ wheels/
 .env
 
 flow.txt
-fine-tuning/commands.json
-fine-tuning/complex_linux_commands_million.json
+fine-tuning
+qwen-icmd
+llama.cpp
+qwen-icmd-q4.gguf
+upload.py
