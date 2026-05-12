@@ -11,9 +11,5 @@ wheels/
 .git
 .env
 
-flow.txt
 fine-tuning
-qwen-icmd
-llama.cpp
-qwen-icmd-q4.gguf
-upload.py
+.pytest_cache

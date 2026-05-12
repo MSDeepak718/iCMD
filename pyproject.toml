@@ -4,18 +4,27 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "icmd-cli"
-version = "0.1.8"
+version = "0.2.1"
 description = "AI-powered command line tool using local LLM"
 readme = "README.md"
 authors = [
     {name = "Deepak Karthick"}
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+]
 dependencies = [
     "huggingface-hub>=1.7.2",
     "requests",
 ]
+
+[project.urls]
+Homepage = "https://github.com/MSDeepak718/iCMD"
+Repository = "https://github.com/MSDeepak718/iCMD"
+
 [project.scripts]
 icmd = "icmd.main:run"
-[tool.setuptools.package-data]
-icmd = ["bin/*"]

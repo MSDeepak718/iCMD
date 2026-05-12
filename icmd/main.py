@@ -15,6 +15,7 @@ def run():
     if len(sys.argv) < 2:
         print("Usage: icmd \"your query\"")
         return
+    
     OS = platform.system()
     query = " ".join(sys.argv[1:])
     command = llm(query, OS)

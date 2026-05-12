@@ -1,30 +1,102 @@
 import os
 import re
+import sys
+import stat
+import platform
+import zipfile
+import tarfile
 import subprocess
+import urllib.request
 from huggingface_hub import hf_hub_download
 
 MODEL_REPO = "MSDeepak718/qwen-icmd"
-MODEL_FILE = "qwen-icmd-q4.gguf"
+MODEL_FILE = "qwen-icmd-f16.gguf"
+LLAMA_VERSION = "b9095"
 
 CACHE_DIR = os.path.expanduser("~/.icmd_model")
 MODEL_PATH = os.path.join(CACHE_DIR, MODEL_FILE)
 
-# Path to bundled llama binary
-LLAMA_BIN = os.path.join(os.path.dirname(__file__), "bin/llama-cli")
+def get_llama_bin_path():
+    ext = ".exe" if platform.system().lower() == "windows" else ""
+    return os.path.join(CACHE_DIR, "bin", f"llama-cli{ext}")
 
+LLAMA_BIN = get_llama_bin_path()
+
+def ensure_llama_cli():
+    if os.path.exists(LLAMA_BIN):
+        return
+
+    sys_name = platform.system().lower()
+    machine = platform.machine().lower()
+
+    if sys_name == "windows":
+        asset_os = "win-cpu"
+        arch = "arm64" if "arm" in machine else "x64"
+        archive_ext = ".zip"
+    elif sys_name == "darwin":
+        asset_os = "macos"
+        arch = "arm64" if "arm" in machine else "x64"
+        archive_ext = ".tar.gz"
+    else:
+        asset_os = "ubuntu"
+        arch = "arm64" if "arm" in machine or "aarch" in machine else "x64"
+        archive_ext = ".tar.gz"
+
+    asset_name = f"llama-{LLAMA_VERSION}-bin-{asset_os}-{arch}{archive_ext}"
+    url = f"https://github.com/ggerganov/llama.cpp/releases/download/{LLAMA_VERSION}/{asset_name}"
+    
+    print(f"Downloading llama-cli {LLAMA_VERSION} for {sys_name} {arch}...")
+    archive_path = os.path.join(CACHE_DIR, asset_name)
+    
+    try:
+        urllib.request.urlretrieve(url, archive_path)
+    except Exception as e:
+        print(f"Failed to download from {url}: {e}")
+        print("Please download the binary manually or check your internet connection.")
+        sys.exit(1)
+        
+    print("Extracting llama-cli...")
+    extract_dir = os.path.join(CACHE_DIR, "bin")
+    os.makedirs(extract_dir, exist_ok=True)
+    
+    try:
+        if archive_ext == ".zip":
+            with zipfile.ZipFile(archive_path, 'r') as zip_ref:
+                zip_ref.extractall(extract_dir)
+        else:
+            with tarfile.open(archive_path, 'r:gz') as tar_ref:
+                for member in tar_ref.getmembers():
+                    parts = member.name.split('/', 1)
+                    if len(parts) > 1:
+                        member.name = parts[1]
+                        tar_ref.extract(member, extract_dir)
+    except Exception as e:
+        print(f"Failed to extract {archive_path}: {e}")
+        sys.exit(1)
+        
+    if os.path.exists(archive_path):
+        os.remove(archive_path)
+        
+    if not os.path.exists(LLAMA_BIN):
+        print("Could not find llama-cli in the downloaded archive.")
+        sys.exit(1)
+
+    if sys_name != "windows":
+        st = os.stat(LLAMA_BIN)
+        os.chmod(LLAMA_BIN, st.st_mode | stat.S_IEXEC)
 
 def ensure_model():
     os.makedirs(CACHE_DIR, exist_ok=True)
+    ensure_llama_cli()
 
     if not os.path.exists(MODEL_PATH):
-        print("Downloading iCMD model (~400MB)...")
+        print("Downloading iCMD model from Hugging Face")
 
         hf_hub_download(
             repo_id=MODEL_REPO,
             filename=MODEL_FILE,
             local_dir=CACHE_DIR
         )
-
 
 def extract_command(raw_output, user_input):
     text = raw_output.replace("\r", "")
@@ -113,7 +185,7 @@ output:"""
         text=True,
         timeout=60,
     )
-
+    
     if result.returncode != 0:
         return f"Error running model: {result.stderr.strip() or result.stdout.strip() or 'unknown error'}"
 
